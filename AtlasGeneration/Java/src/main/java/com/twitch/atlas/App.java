@@ -1,17 +1,14 @@
-import py4j.GatewayServer;
-// import uk.ac.ox.oii.jsonexporter.JSONExporter;
+package com.twitch.atlas;
 
-import org.openide.util.Lookup;
-import org.gephi.project.api.*;
-import org.gephi.statistics.api.StatisticsController;
-import org.gephi.statistics.api.StatisticsModel;
-import org.gephi.statistics.plugin.Degree;
-import org.gephi.statistics.plugin.GraphDistance;
-import org.gephi.statistics.plugin.Modularity;
-import org.gephi.statistics.plugin.WeightedDegree;
+import java.awt.Color;
+import java.awt.Font;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.gephi.appearance.api.AppearanceController;
 import org.gephi.appearance.api.AppearanceModel;
-import org.gephi.appearance.api.AttributeFunction;
 import org.gephi.appearance.api.Function;
 import org.gephi.appearance.api.Partition;
 import org.gephi.appearance.api.PartitionFunction;
@@ -20,78 +17,57 @@ import org.gephi.appearance.plugin.RankingLabelSizeTransformer;
 import org.gephi.appearance.plugin.RankingNodeSizeTransformer;
 import org.gephi.appearance.plugin.palette.Palette;
 import org.gephi.appearance.plugin.palette.PaletteManager;
-import org.gephi.datalab.api.AttributeColumnsController;
 import org.gephi.filters.api.FilterController;
 import org.gephi.filters.api.Query;
 import org.gephi.filters.api.Range;
-import org.gephi.filters.plugin.edge.EdgeWeightBuilder.EdgeWeightFilter;
 import org.gephi.filters.plugin.graph.DegreeRangeBuilder.DegreeRangeFilter;
-import org.gephi.graph.api.*;
+import org.gephi.graph.api.Column;
+import org.gephi.graph.api.Edge;
 import org.gephi.graph.api.Graph;
-import org.gephi.io.importer.api.*;
+import org.gephi.graph.api.GraphController;
+import org.gephi.graph.api.GraphModel;
+import org.gephi.graph.api.GraphView;
+import org.gephi.graph.api.Node;
+import org.gephi.graph.api.UndirectedGraph;
+import org.gephi.io.database.drivers.SQLiteDriver;
+import org.gephi.io.exporter.api.ExportController;
+import org.gephi.io.exporter.preview.PNGExporter;
+import org.gephi.io.importer.api.Container;
+import org.gephi.io.importer.api.EdgeDirectionDefault;
+import org.gephi.io.importer.api.ImportController;
 import org.gephi.io.importer.plugin.database.EdgeListDatabaseImpl;
 import org.gephi.io.importer.plugin.database.ImporterEdgeList;
-import org.gephi.layout.api.*;
-import org.gephi.layout.plugin.*;
-import org.gephi.layout.plugin.forceAtlas2.*;
-import org.gephi.layout.plugin.fruchterman.FruchtermanReingold;
-import org.gephi.layout.plugin.labelAdjust.LabelAdjust;
-import org.gephi.layout.plugin.openord.OpenOrdLayout;
-import org.gephi.layout.plugin.scale.ExpandLayout;
-import org.gephi.layout.plugin.scale.ContractLayout;
-
+import org.gephi.io.processor.plugin.DefaultProcessor;
+import org.gephi.layout.plugin.forceAtlas2.ForceAtlas2;
 import org.gephi.layout.spi.Layout;
-import org.gephi.layout.plugin.force.Displacement;
-import org.gephi.layout.plugin.force.StepDisplacement;
-import org.gephi.layout.plugin.force.yifanHu.*;
 import org.gephi.preview.api.PreviewController;
 import org.gephi.preview.api.PreviewModel;
 import org.gephi.preview.api.PreviewProperty;
 import org.gephi.preview.types.DependantColor;
 import org.gephi.preview.types.DependantOriginalColor;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.lang.Object.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import javax.imageio.ImageIO;
-
-import org.gephi.io.processor.plugin.DefaultProcessor;
-import org.gephi.io.processor.spi.*;
-import org.gephi.io.database.drivers.PostgreSQLDriver;
-import org.gephi.io.exporter.api.*;
-import org.gephi.io.exporter.preview.PNGExporter;
-
-import java.awt.image.BufferedImage;
-
-import java.awt.Color;
-import java.awt.Font;
+import org.gephi.project.api.ProjectController;
+import org.gephi.project.api.Workspace;
+import org.gephi.statistics.plugin.Modularity;
+import org.openide.util.Lookup;
 
 // import uk.ac.ox.oii.jsonexporter.JSONExporter;
+public class App {
 
-public class App 
-{   
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
         // GatewayServer gatewayServer = new GatewayServer(new App());
         // gatewayServer.start();
         // System.out.println("Gateway Server Started");
-        Run(9);
+        System.setProperty("jdbc.drivers", "org.sqlite.JDBC");
+        System.setProperty("org.netbeans.core.startup.preferences.PreferencesProviderImpl", "false");
+        Run(0);
     }
 
-    public static void Run(int batch_id)
-    {
+    public static void Run(int batch_id) {
         System.out.println("Atlas Generation Started");
         // Init a project - and therefore a workspace
-        
+
         int numImages = 10;
-        for (int i = 0; i < numImages; i++)
-        {
+        for (int i = 0; i < numImages; i++) {
             ProjectController pc = Lookup.getDefault().lookup(ProjectController.class);
             pc.newProject();
             Workspace workspace = pc.getCurrentWorkspace();
@@ -102,7 +78,7 @@ public class App
 
             LayoutGraph(graphModel);
             SetGraphPreview();
-        
+
             UndirectedGraph graph = graphModel.getUndirectedGraph();
             // ExportGexf(graph, "../../Website/webdata.json");
             ExportGraph(graph, i);
@@ -111,8 +87,7 @@ public class App
         System.exit(0);
     }
 
-    public static void SetGraphPreview()
-    {
+    public static void SetGraphPreview() {
         //Preview
         PreviewModel model = Lookup.getDefault().lookup(PreviewController.class).getModel();
         //Node Label Properties
@@ -124,7 +99,7 @@ public class App
 
         model.getProperties().putValue(PreviewProperty.NODE_LABEL_OUTLINE_SIZE, 4.0f);
         model.getProperties().putValue(PreviewProperty.NODE_LABEL_OUTLINE_OPACITY, 40);
-        model.getProperties().putValue(PreviewProperty.NODE_LABEL_OUTLINE_COLOR, new DependantColor (Color.BLACK));
+        model.getProperties().putValue(PreviewProperty.NODE_LABEL_OUTLINE_COLOR, new DependantColor(Color.BLACK));
 
         //Edge Properties
         model.getProperties().putValue(PreviewProperty.SHOW_EDGES, Boolean.TRUE);
@@ -134,26 +109,21 @@ public class App
         model.getProperties().putValue(PreviewProperty.EDGE_RESCALE_WEIGHT_MIN, 1);
         model.getProperties().putValue(PreviewProperty.EDGE_OPACITY, 20);
 
-
         //Image Properties
         model.getProperties().putValue(PreviewProperty.BACKGROUND_COLOR, Color.BLACK);
-
-        return;
     }
 
-    public static void LayoutGraph(GraphModel graphModel)
-    {
+    public static void LayoutGraph(GraphModel graphModel) {
         Graph undirectedGraph = graphModel.getUndirectedGraph();
         //Apply graph filters 
         //Filter, remove degree < 10
         // Range range = new Range((int) 10, Integer.MAX_VALUE, 0, Integer.MAX_VALUE);
-    
+
         System.out.println("Edge removal");
         int edgeWeightLowerBound = 1000;
         List<Edge> edgesToRemove = new ArrayList<>();
         for (Edge e : undirectedGraph.getEdges().toArray()) {
-            if((double) e.getAttribute("Weight") < edgeWeightLowerBound)
-            {
+            if ((double) e.getAttribute("Weight") < edgeWeightLowerBound) {
                 edgesToRemove.add(e);
             }
         }
@@ -165,19 +135,15 @@ public class App
         System.out.println("before node removal graph contains node count: ");
         System.out.println(undirectedGraph.getNodeCount());
 
-        int nodeCountLowerBound = 1 ;
+        int nodeCountLowerBound = 1;
         List<Node> nodesToRemove = new ArrayList<>();
         for (Node n : undirectedGraph.getNodes().toArray()) {
-            
+
             Object count = n.getAttribute("count");
-            if(count == null)
-            {
+            if (count == null) {
                 nodesToRemove.add(n);
-            }
-            else
-            {
-                if((long) count < nodeCountLowerBound)
-                {
+            } else {
+                if ((long) count < nodeCountLowerBound) {
                     nodesToRemove.add(n);
                 }
             }
@@ -196,7 +162,6 @@ public class App
         GraphView view = filterController.filter(query);
         graphModel.setVisibleView(view); //Set the filter result as the visible view
 
-
         Modularity modularity = new Modularity();
         modularity.setResolution(0.4);
         modularity.setUseWeight(true);
@@ -207,20 +172,24 @@ public class App
         AppearanceModel appearanceModel = appearanceController.getModel();
 
         Column modColumn = graphModel.getNodeTable().getColumn(Modularity.MODULARITY_CLASS);
-        
+
         Function func2 = appearanceModel.getNodeFunction(modColumn, PartitionElementColorTransformer.class);
         Partition partition2 = ((PartitionFunction) func2).getPartition();
 
         Palette palette2 = PaletteManager.getInstance().randomPalette(partition2.size(undirectedGraph));
 
-        int i =0;
-        for (Object o: partition2.getValues(undirectedGraph)){
-            partition2.setColor(o,palette2.getColors()[i]);
+        int i = 0;
+        for (Object o : partition2.getValues(undirectedGraph)) {
+            partition2.setColor(o, palette2.getColors()[i]);
             i++;
         }
         appearanceController.transform(func2);
 
         Column rankingCol = graphModel.getNodeTable().getColumn("count");
+
+        if (rankingCol == null) {
+            throw new RuntimeException("Column 'count' does not exist in GraphModel. Check if it's being imported correctly.");
+        }
 
         Function rankingNodeSize = appearanceModel.getNodeFunction(rankingCol, RankingNodeSizeTransformer.class);
         Function rankingLabelSize = appearanceModel.getNodeFunction(rankingCol, RankingLabelSizeTransformer.class);
@@ -242,19 +211,12 @@ public class App
         // labelAdjustStep.setGraphModel(graphModel);
         // labelAdjustStep.setAdjustBySize(true);
         // labelAdjustStep.setSpeed(10.0);
-
-        
         // YifanHuLayout yifanHuStep = new YifanHuLayout(null, new StepDisplacement(1f));
         // yifanHuStep.setGraphModel(graphModel);
         // yifanHuStep.setOptimalDistance(1000f);
-
         // OpenOrdLayout openOrdLayout = new OpenOrdLayout(null);
-
         // ExpandLayout expandLayout = new ExpandLayout(null, 1.05);
-
         // FruchtermanReingold fruchtermanReingoldStep = new FruchtermanReingold(null);
-
-
         //FORCE ATLAS INITIALIZATION
         ForceAtlas2 forceAtlasStep = new ForceAtlas2(null);
         forceAtlasStep.resetPropertiesValues();
@@ -273,10 +235,9 @@ public class App
         int firstAlgoSteps = 750;
 
         firstAlgo.initAlgo();
-        
+
         System.out.println("FIRST PHASE EXECUTION");
-        for (int k = 0; k < firstAlgoSteps; k++)
-        {
+        for (int k = 0; k < firstAlgoSteps; k++) {
             firstAlgo.goAlgo();
         }
 
@@ -285,10 +246,9 @@ public class App
         forceAtlasStep.setLinLogMode(false);
         forceAtlasStep.setEdgeWeightInfluence(0.28d);
         int secondAlgoSteps = 350;
-        
+
         System.out.println("SECOND PHASE EXECUTION");
-        for (int k = 0; k < secondAlgoSteps; k++)
-        {
+        for (int k = 0; k < secondAlgoSteps; k++) {
             firstAlgo.goAlgo();
         }
 
@@ -297,53 +257,57 @@ public class App
         forceAtlasStep.setLinLogMode(true);
         forceAtlasStep.setEdgeWeightInfluence(0.45d);
         int thirdAlgoSteps = 1100;
-        
+
         System.out.println("THIRD PHASE EXECUTION");
-        for (int k = 0; k < thirdAlgoSteps; k++)
-        {
+        for (int k = 0; k < thirdAlgoSteps; k++) {
             firstAlgo.goAlgo();
         }
 
         System.out.println("ENDING LAYOUT EXECUTION");
-        return;
     }
 
-    public static GraphModel LoadGraph(ImportController importController, Workspace workspace, int batch_id)
-    {
+    public static GraphModel LoadGraph(ImportController importController, Workspace workspace, int batch_id) {
         System.out.println("STARTING LOAD GRAPH");
-        // System.out.println(System.getenv("DB_PASSWORD"));
 
-        //Load gephi from rdbms
-        //Get controllers and models
+        // Define database path once
+        String dbPath = "jdbc:sqlite:C:/Users/curtr/Documents/DB/twitch.db";
+
+        // Load Gephi from RDBMS
+        // Get controllers and models
         GraphModel graphModel = Lookup.getDefault().lookup(GraphController.class).getGraphModel();
-        
-        //Import database
-        EdgeListDatabaseImpl db = new EdgeListDatabaseImpl();
-        db.setDBName("wobbly-herder-2498.twitchatlas");
-        db.setHost("free-tier4.aws-us-west-2.cockroachlabs.cloud");
-        db.setUsername("kiran");
-        db.setPasswd(System.getenv("DB_PASSWORD"));
-        db.setPort(26257);
-        db.setSQLDriver(new PostgreSQLDriver());
 
-        db.setNodeQuery("SELECT c.url_name as id, c.url_name as label, c.view_minutes as count from channels c");
-        db.setEdgeQuery("SELECT source, target, weight FROM channel_overlaps where batch_id=" + String.valueOf(batch_id));
-    
+        File file = new File("C:/Users/curtr/Documents/DB/twitch.db");
+
+        // Import database into Gephi
+        EdgeListDatabaseImpl db = new EdgeListDatabaseImpl();
+        db.setHost(file.getAbsolutePath());
+        db.setDBName("");
+        db.setSQLDriver(new SQLiteDriver());
+
+        // Debugging check
+        if (db.getSQLDriver() == null) {
+            throw new IllegalStateException("SQLite driver is not properly set in EdgeListDatabaseImpl.");
+        }
+
+        System.out.println("Gephi DB Driver: " + db.getSQLDriver().getClass().getName());
+        System.out.println("Database Path: " + dbPath);
+        System.out.println("Node Query: " + db.getNodeQuery());
+        System.out.println("Edge Query: " + db.getEdgeQuery());
+
         System.out.println("IMPORTING DATABASE");
         ImporterEdgeList edgeListImporter = new ImporterEdgeList();
         Container container = importController.importDatabase(db, edgeListImporter);
-        container.getLoader().setEdgeDefault(EdgeDirectionDefault.UNDIRECTED);   //Force UNDIRECTED
-        
+        container.getLoader().setEdgeDefault(EdgeDirectionDefault.UNDIRECTED);   // Force UNDIRECTED
+
         System.out.println("PROCESSING DATABASE");
-        //Append imported data to GraphAPI
+        // Append imported data to GraphAPI
         importController.process(container, new DefaultProcessor(), workspace);
 
         System.out.println("ENDING LOAD GRAPH");
         return graphModel;
     }
 
-    public static void ExportGraph(Graph graph, int imageNum)
-    {
+    public static void ExportGraph(Graph graph, int imageNum) {
         // ExportController ec = Lookup.getDefault().lookup(ExportController.class);
         // PNGExporter exporter = (PNGExporter) ec.getExporter("png");
         // ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -366,26 +330,20 @@ public class App
         try {
             ec.exportFile(new File("../Images/GeneratedAtlas" + String.valueOf(imageNum) + ".png"), exporter);
         } catch (IOException ex) {
-            ex.printStackTrace();
         }
         System.out.println("ENDING");
-        return;
-    }   
+    }
 
-    public static void ExportGexf(Graph graph, String filename)
-    {
+    public static void ExportGexf(Graph graph, String filename) {
         // ExportController ec = Lookup.getDefault().lookup(ExportController.class);
         // JSONExporter exporter = new JSONExporter();
         // // exporter.setExportVisible(true); //Only exports the visible (filtered) graph
 
-      
         // try {
         //     ec.exportFile(new File(filename), exporter);
         // } catch (IOException ex) {
         //     ex.printStackTrace();
         // }
         // System.out.println("ENDING");
-        return;
-    }   
+    }
 }
-

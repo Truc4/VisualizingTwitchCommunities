@@ -25,7 +25,7 @@ def lambda_handler(event, context):
         "moonmoon",
         "xqc",
         "plaqueboymax",
-        "thebauseffs",
+        "thebausffs",
         "kaicenat",
         "caedrel",
         "ohnepixel",
