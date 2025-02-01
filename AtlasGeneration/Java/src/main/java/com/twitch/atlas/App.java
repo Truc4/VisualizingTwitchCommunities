@@ -17,21 +17,16 @@ import org.gephi.appearance.plugin.RankingLabelSizeTransformer;
 import org.gephi.appearance.plugin.RankingNodeSizeTransformer;
 import org.gephi.appearance.plugin.palette.Palette;
 import org.gephi.appearance.plugin.palette.PaletteManager;
-import org.gephi.filters.api.FilterController;
-import org.gephi.filters.api.Query;
-import org.gephi.filters.api.Range;
-import org.gephi.filters.plugin.graph.DegreeRangeBuilder.DegreeRangeFilter;
 import org.gephi.graph.api.Column;
 import org.gephi.graph.api.Edge;
 import org.gephi.graph.api.Graph;
 import org.gephi.graph.api.GraphController;
 import org.gephi.graph.api.GraphModel;
-import org.gephi.graph.api.GraphView;
-import org.gephi.graph.api.Node;
 import org.gephi.graph.api.UndirectedGraph;
 import org.gephi.io.database.drivers.SQLiteDriver;
 import org.gephi.io.exporter.api.ExportController;
 import org.gephi.io.exporter.preview.PNGExporter;
+import org.gephi.io.exporter.spi.GraphExporter;
 import org.gephi.io.importer.api.Container;
 import org.gephi.io.importer.api.EdgeDirectionDefault;
 import org.gephi.io.importer.api.ImportController;
@@ -103,11 +98,10 @@ public class App {
 
         //Edge Properties
         model.getProperties().putValue(PreviewProperty.SHOW_EDGES, Boolean.TRUE);
-        model.getProperties().putValue(PreviewProperty.EDGE_THICKNESS, 1.0);
+        model.getProperties().putValue(PreviewProperty.EDGE_THICKNESS, 10.0);
         model.getProperties().putValue(PreviewProperty.EDGE_RESCALE_WEIGHT, Boolean.TRUE);
-        model.getProperties().putValue(PreviewProperty.EDGE_RESCALE_WEIGHT_MIN, 0.1);
-        model.getProperties().putValue(PreviewProperty.EDGE_RESCALE_WEIGHT_MIN, 1);
-        model.getProperties().putValue(PreviewProperty.EDGE_OPACITY, 20);
+        model.getProperties().putValue(PreviewProperty.EDGE_RESCALE_WEIGHT_MIN, .1);
+        model.getProperties().putValue(PreviewProperty.EDGE_OPACITY, 100);
 
         //Image Properties
         model.getProperties().putValue(PreviewProperty.BACKGROUND_COLOR, Color.BLACK);
@@ -115,9 +109,6 @@ public class App {
 
     public static void LayoutGraph(GraphModel graphModel) {
         Graph undirectedGraph = graphModel.getUndirectedGraph();
-        //Apply graph filters 
-        //Filter, remove degree < 10
-        // Range range = new Range((int) 10, Integer.MAX_VALUE, 0, Integer.MAX_VALUE);
 
         System.out.println("Edge removal");
         int edgeWeightLowerBound = 1000;
@@ -128,46 +119,56 @@ public class App {
             }
         }
         if (!edgesToRemove.isEmpty()) {
-
             undirectedGraph.removeAllEdges(edgesToRemove);
         }
 
         System.out.println("before node removal graph contains node count: ");
         System.out.println(undirectedGraph.getNodeCount());
 
-        int nodeCountLowerBound = 1;
-        List<Node> nodesToRemove = new ArrayList<>();
-        for (Node n : undirectedGraph.getNodes().toArray()) {
-
-            Object count = n.getAttribute("count");
-            if (count == null) {
-                nodesToRemove.add(n);
-            } else {
-                if ((long) count < nodeCountLowerBound) {
-                    nodesToRemove.add(n);
-                }
-            }
-        }
-        if (!nodesToRemove.isEmpty()) {
-            undirectedGraph.removeAllNodes(nodesToRemove);
-        }
+        // Comment out node removal logic to ensure no nodes are removed
+        // int nodeCountLowerBound = 1;
+        // List<Node> nodesToRemove = new ArrayList<>();
+        // for (Node n : undirectedGraph.getNodes().toArray()) {
+        //     Object count = n.getAttribute("count");
+        //     if (count == null) {
+        //         nodesToRemove.add(n);
+        //     } else {
+        //         long countValue;
+        //         if (count instanceof Integer) {
+        //             countValue = ((Integer) count).longValue();
+        //         } else if (count instanceof Long) {
+        //             countValue = (Long) count;
+        //         } else {
+        //             continue;
+        //         }
+        //         if (countValue < nodeCountLowerBound) {
+        //             nodesToRemove.add(n);
+        //         }
+        //     }
+        // }
+        // if (!nodesToRemove.isEmpty()) {
+        //     undirectedGraph.removeAllNodes(nodesToRemove);
+        // }
         System.out.println("After node removal graph contains node count: ");
         System.out.println(undirectedGraph.getNodeCount());
 
-        //Filter, remove degree < 10
-        FilterController filterController = Lookup.getDefault().lookup(FilterController.class);
-        DegreeRangeFilter degreeFilter = new DegreeRangeFilter();
-        degreeFilter.setRange(new Range(1, Integer.MAX_VALUE)); //Remove nodes with degree < 10
-        Query query = filterController.createQuery(degreeFilter);
-        GraphView view = filterController.filter(query);
-        graphModel.setVisibleView(view); //Set the filter result as the visible view
-
+        // Disable or bypass filtering step
+        // Remove degree filter by commenting out the following lines
+        // FilterController filterController = Lookup.getDefault().lookup(FilterController.class);
+        // DegreeRangeFilter degreeFilter = new DegreeRangeFilter();
+        // degreeFilter.setRange(new Range(1, Integer.MAX_VALUE)); // Remove nodes with degree < 10
+        // Query query = filterController.createQuery(degreeFilter);
+        // GraphView view = filterController.filter(query);
+        // graphModel.setVisibleView(view); // Set the filter result as the visible view
+        // No filtering, just keep the entire graph visible
+        // Optionally, set the entire graph as visible again if filtering is applied
+        // graphModel.setVisibleView(graphModel.getGraphView());
         Modularity modularity = new Modularity();
         modularity.setResolution(0.4);
         modularity.setUseWeight(true);
         modularity.execute(graphModel);
 
-        //Partition with ‘modularity_class’, just created by Modularity algorithm
+        // Partition with 'modularity_class', just created by Modularity algorithm
         AppearanceController appearanceController = Lookup.getDefault().lookup(AppearanceController.class);
         AppearanceModel appearanceModel = appearanceController.getModel();
 
@@ -206,23 +207,10 @@ public class App {
         appearanceController.transform(rankingNodeSize);
         appearanceController.transform(rankingLabelSize);
 
-        // Unused layouts
-        // LabelAdjust labelAdjustStep = new LabelAdjust(null);
-        // labelAdjustStep.setGraphModel(graphModel);
-        // labelAdjustStep.setAdjustBySize(true);
-        // labelAdjustStep.setSpeed(10.0);
-        // YifanHuLayout yifanHuStep = new YifanHuLayout(null, new StepDisplacement(1f));
-        // yifanHuStep.setGraphModel(graphModel);
-        // yifanHuStep.setOptimalDistance(1000f);
-        // OpenOrdLayout openOrdLayout = new OpenOrdLayout(null);
-        // ExpandLayout expandLayout = new ExpandLayout(null, 1.05);
-        // FruchtermanReingold fruchtermanReingoldStep = new FruchtermanReingold(null);
-        //FORCE ATLAS INITIALIZATION
+        // No layout changes needed for this example, but here you can continue with your layout logic
         ForceAtlas2 forceAtlasStep = new ForceAtlas2(null);
         forceAtlasStep.resetPropertiesValues();
         forceAtlasStep.setGraphModel(graphModel);
-        // forceAtlasStep.setBarnesHutOptimize(true);
-        // forceAtlasStep.setBarnesHutTheta(-100d);
         forceAtlasStep.setAdjustSizes(true);
         forceAtlasStep.setLinLogMode(true);
         forceAtlasStep.setOutboundAttractionDistribution(false);
@@ -230,7 +218,7 @@ public class App {
         forceAtlasStep.setGravity(3d);
         forceAtlasStep.setEdgeWeightInfluence(0.45d);
 
-        //RUN FIRST PHASE
+        // RUN FIRST PHASE
         Layout firstAlgo = forceAtlasStep;
         int firstAlgoSteps = 750;
 
@@ -241,7 +229,7 @@ public class App {
             firstAlgo.goAlgo();
         }
 
-        //CHANGE PARAMETERS AND RUN SECOND PHASE
+        // CHANGE PARAMETERS AND RUN SECOND PHASE
         forceAtlasStep.setScalingRatio(1.5d);
         forceAtlasStep.setLinLogMode(false);
         forceAtlasStep.setEdgeWeightInfluence(0.28d);
@@ -252,7 +240,7 @@ public class App {
             firstAlgo.goAlgo();
         }
 
-        //CHANGE PARAMETERS AND RUN THIRD PHASE
+        // CHANGE PARAMETERS AND RUN THIRD PHASE
         forceAtlasStep.setScalingRatio(1.6d);
         forceAtlasStep.setLinLogMode(true);
         forceAtlasStep.setEdgeWeightInfluence(0.45d);
@@ -289,10 +277,14 @@ public class App {
             throw new IllegalStateException("SQLite driver is not properly set in EdgeListDatabaseImpl.");
         }
 
+        // db.setDBName("C:/Users/curtr/Documents/DB/twitch.db");
+        db.setNodeQuery("SELECT c.url_name as id, c.url_name as label, c.view_minutes as count from channels c");
+        db.setEdgeQuery("SELECT source, target, weight FROM channel_overlaps where batch_id=" + batch_id);
+
         System.out.println("Gephi DB Driver: " + db.getSQLDriver().getClass().getName());
         System.out.println("Database Path: " + dbPath);
-        System.out.println("Node Query: " + db.getNodeQuery());
-        System.out.println("Edge Query: " + db.getEdgeQuery());
+        // System.out.println("Node Query: " + db.getNodeQuery());
+        // System.out.println("Edge Query: " + db.getEdgeQuery());
 
         System.out.println("IMPORTING DATABASE");
         ImporterEdgeList edgeListImporter = new ImporterEdgeList();
@@ -328,9 +320,23 @@ public class App {
         exporter.setWidth(4500);
 
         try {
-            ec.exportFile(new File("../Images/GeneratedAtlas" + String.valueOf(imageNum) + ".png"), exporter);
+            ec.exportFile(new File("./Images/GeneratedAtlas" + String.valueOf(imageNum) + ".png"), exporter);
         } catch (IOException ex) {
+            ex.printStackTrace();
         }
+
+        // Export GEXF
+        try {
+            GraphExporter graphExporter = (GraphExporter) ec.getExporter("gexf"); // Get GEXF exporter
+            graphExporter.setExportVisible(true); // Export only visible graph
+            graphExporter.setWorkspace(Lookup.getDefault().lookup(ProjectController.class).getCurrentWorkspace()); // Set the workspace to ensure the correct graph view is exported
+
+            // Export the graph as a GEXF file
+            ec.exportFile(new File("./Images/GeneratedAtlas" + String.valueOf(imageNum) + ".gexf"), graphExporter);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+
         System.out.println("ENDING");
     }
 

@@ -67,9 +67,6 @@ def main():
     except Exception as e:
         logger.error(e)
 
-    #Post image to TwitchAtlas Twitter account using Twitter API
-    if POST_IMAGE_TO_TWITTER:
-        pass
 
     return
 
