@@ -3,6 +3,8 @@ from sqlalchemy.sql.expression import func
 from datetime import datetime
 import _pickle as cPickle
 import logging
+import json
+import os
 logging.basicConfig(filename='overlaps.log', level=logging.DEBUG, 
                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
 logger=logging.getLogger(__name__)
@@ -100,15 +102,16 @@ class OverlapsManager:
 
     def get_chatters(self, chatters_table, channel):
         stmt = sql.select(chatters_table.c.chatters_json).where(
-                        chatters_table.c.url_name == channel, 
-                        chatters_table.c.log_time >= self.start_time, 
-                        chatters_table.c.log_time <= self.end_time
-                    )
-        
+            chatters_table.c.url_name == channel, 
+            chatters_table.c.log_time >= self.start_time, 
+            chatters_table.c.log_time <= self.end_time
+        )
+
         with self.engine.connect() as conn:
             res = conn.execute(stmt).fetchall()
 
-        res = [r for r, in res]
+        # Convert JSON strings to Python dictionaries
+        res = [json.loads(r[0]) for r in res]  # Convert each row's JSON data into a dictionary
 
         return self.condense_chatters(res)
 
@@ -128,7 +131,7 @@ class OverlapsManager:
                 counter += 1
         
                 #Load comparison chatters from pkl object
-                with open(f'tmp/channel_{c2}_set', 'rb') as handle:
+                with open(f'tmp/channel_{c2}_set.pkl', 'rb') as handle:
                     c2_set = cPickle.load(handle)
                 
                 #Calculate overlaps and append to result
@@ -141,8 +144,10 @@ class OverlapsManager:
         logging.info("Generating chatter sets as pkl objects")
         chatters_table = sql.Table('chatters', self.metadata_obj, autoload_with=self.engine)
 
-        #Get chatters within time window from each selected channel, dumping sets into individual pickle objects
-        #This is done to reduce sql queries required while preserving memory usage. File I/O times are long but better than thousands of unnecesary queries from a slow database
+        # Ensure the 'tmp' directory exists
+        os.makedirs("tmp", exist_ok=True)
+
+        # Get chatters within the time window from each selected channel, dumping sets into individual pickle objects
         with self.engine.connect() as conn:
             for channel in channels:
                 chatter_set = self.get_chatters(chatters_table, channel)
@@ -150,7 +155,6 @@ class OverlapsManager:
                     cPickle.dump(chatter_set, handle)
                 logging.info(f"Dumped chatter set for {channel}")
 
-        return 
                 
     def calc_stats(self, batch_id):
         import networkx as nx
@@ -191,7 +195,7 @@ if __name__ == "__main__":
     load_dotenv()
 
     start_time = "2022-10-10 00:00:00.000"
-    end_time = "2022-11-08 00:00:00.000"
+    end_time = "2026-11-08 00:00:00.000"
 
     om = OverlapsManager(start_time=start_time, end_time=end_time, db_url=os.environ.get("DB_URL"))
     om.run(gen_chatter_sets = True, calc_chatter_overlaps = True)

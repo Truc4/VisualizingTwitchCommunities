@@ -22,9 +22,19 @@ def main():
         start_time = datetime.date.today()
         end_time = start_time - datetime.timedelta(days=30)
 
+        # Ensure OverlapsManager commits data to the database
         OM = OverlapsManager(start_time=start_time, end_time=end_time, db_url=os.environ.get("DB_URL"))
-        OM.run()
-        OM.dump_overlaps_to_db()
+
+        with engine.connect() as conn:
+            trans = conn.begin()  # Start a transaction
+            try:
+                OM.run()
+                OM.dump_overlaps_to_db(conn)  # Ensure this method uses the provided connection
+                trans.commit()  # Commit the transaction
+            except Exception as e:
+                trans.rollback()  # Roll back if there’s an error
+                logger.error(f"Error during overlaps calculation: {e}")
+
 
     #Get newest batch_id
     engine = sql.create_engine(os.environ.get("DB_URL"))
@@ -34,10 +44,20 @@ def main():
     stmt = sql.select(func.max(overlaps_table.c.batch_id))
 
     with engine.connect() as conn:
-        res = conn.execute(stmt).fetchall()
+        trans = conn.begin()  # Start a transaction
+        try:
+            # Get the newest batch_id
+            stmt = sql.select(func.max(overlaps_table.c.batch_id))
+            res = conn.execute(stmt).fetchall()
+            batch_id = res[0][0]
+            print(batch_id)
 
-    batch_id = res[0][0]
-    print(batch_id)
+            # Add other database operations here if needed
+            trans.commit()  # Commit the transaction
+        except Exception as e:
+            trans.rollback()  # Roll back if there’s an error
+            logger.error(f"Error querying or inserting batch_id: {e}")
+
 
     #Connect to Java program with access to GephiToolkit to create the Twitch Atlas image
     gateway = JavaGateway()  
